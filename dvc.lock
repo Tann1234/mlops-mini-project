@@ -48,24 +48,24 @@ stages:
       size: 3883
     params:
       params.yaml:
-        feature_engineering.max_features: 100
+        feature_engineering.max_features: 450
     outs:
     - path: data/processed
       hash: md5
-      md5: 92cb739a40af9100208a505e12e202f3.dir
-      size: 2106516
+      md5: a629c072b0e291a14663f8ffb035a19f.dir
+      size: 9371116
       nfiles: 2
     - path: models/vectorizer.pkl
       hash: md5
-      md5: faa192175f161cc52806fa6512a41f50
-      size: 3177
+      md5: 786c3c7ffaaddd4e277e5dc3a6d8ba7b
+      size: 12528
   model_building:
     cmd: python src/model/model_building.py
     deps:
     - path: data/processed
       hash: md5
-      md5: 92cb739a40af9100208a505e12e202f3.dir
-      size: 2106516
+      md5: a629c072b0e291a14663f8ffb035a19f.dir
+      size: 9371116
       nfiles: 2
     - path: src/model/model_building.py
       hash: md5
@@ -74,21 +74,32 @@ stages:
     outs:
     - path: models/model.pkl
       hash: md5
-      md5: 4ae034f3613e018089df144543497e4f
-      size: 1496
+      md5: 77fc67b09cc711a2eaf776f90152e67c
+      size: 4298
   model_evaluation:
     cmd: python src/model/model_evaluation.py
     deps:
     - path: models/model.pkl
       hash: md5
-      md5: 4ae034f3613e018089df144543497e4f
-      size: 1496
+      md5: 77fc67b09cc711a2eaf776f90152e67c
+      size: 4298
     - path: src/model/model_evaluation.py
       hash: md5
-      md5: 8572c7070800f484cb7a8c79bb580b36
-      size: 2737
+      md5: 23e2458ed06bc1917ebcfa65d9e5935e
+      size: 3347
     outs:
     - path: reports/metrics.json
       hash: md5
-      md5: 9894b0e3f1078be66dc5411ba97c5c93
-      size: 143
+      md5: ab93e0bf61f61e7ff78b03b9d1719c7c
+      size: 145
+  model_registration:
+    cmd: python src/model/register_model.py
+    deps:
+    - path: reports/experiment_info.json
+      hash: md5
+      md5: 964f9cb1955e37535e9c2c413eca53bc
+      size: 82
+    - path: src/model/register_model.py
+      hash: md5
+      md5: cde59ea2e5aff8846de439fc0323fcb3
+      size: 1435

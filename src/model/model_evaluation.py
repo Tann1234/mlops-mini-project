@@ -43,44 +43,58 @@ def save_metrics(path, metrics_dict):
     with open(path, 'w') as f:
         json.dump(metrics_dict, f, indent=4)
 
+def save_model_info(run_id:str, model_path:str, file_path:str)->None:
+    'Save the model run ID and path to json file.'
+    try:
+        model_info={'run_id': run_id, 'model_path': model_path}
+        with open(file_path, 'w') as file:
+            json.dump(model_info, file, indent=4)
+    except Exception as e:
+        raise
+
+
 def main():
     mlflow.set_experiment('dvc-pipeline')
-    mlflow.start_run()
-    try:
-        clf = load_model('models/model.pkl')
-        X_test, y_test = load_data('./data/processed/test_bow.csv')
-        y_pred, y_pred_proba = make_prediction(clf, X_test)
-        metrics_dict = compute_metrics(y_test, y_pred, y_pred_proba)
+    with mlflow.start_run() as run:
+        try:
+            clf = load_model('models/model.pkl')
+            X_test, y_test = load_data('./data/processed/test_bow.csv')
+            y_pred, y_pred_proba = make_prediction(clf, X_test)
+            metrics_dict = compute_metrics(y_test, y_pred, y_pred_proba)
 
-        # Load parameters
-        with open('params.yaml', 'r') as file:
-            params = yaml.safe_load(file)
+            # Load parameters
+            with open('params.yaml', 'r') as file:
+                params = yaml.safe_load(file)
 
-        # Save metrics to file
-        save_metrics('reports/metrics.json', metrics_dict)
+            # Save metrics to file
+            save_metrics('reports/metrics.json', metrics_dict)
 
-        # log metrics to MLflow
-        for metric_name, metric_value in metrics_dict.items():
-            mlflow.log_metric(metric_name, metric_value)
+            # log metrics to MLflow
+            for metric_name, metric_value in metrics_dict.items():
+                mlflow.log_metric(metric_name, metric_value)
 
-        # log model parameters to MLflow
-        if hasattr(clf, 'get_params'):
-            params=clf.get_params()
-            for param_name,param_value in params.items():
-                mlflow.log_params(param_name, param_value)
+            # log model parameters to MLflow
+            if hasattr(clf, 'get_params'):
+                params = clf.get_params()
+                for param_name, param_value in params.items():
+                    mlflow.log_param(param_name, param_value)
 
-        mlflow.sklearn.log_model(clf, "model")
-            
-            
-        # Log the metrics file to MLflow
-        mlflow.log_artifact('reports/metrics.json')
 
-        # Log the model info file to MLflow
-        mlflow.log_artifact('reports/model_info.json')
+            # log model to Mlflow
+            mlflow.sklearn.log_model(clf, "model")
 
-        # Log the evaluation errors log file to MLflow
-        mlflow.log_artifact('model_evaluation_errors.log')
-    except Exception as  e:
-        print(f'error is occured:{e}')
+            # Save model info
+            save_model_info(run.info.run_id, 'model', 'reports/experiment_info.json')
+                
+            # Log the metrics file to MLflow
+            mlflow.log_artifact('reports/metrics.json')
+
+            # Log the model info file to MLflow
+            mlflow.log_artifact('reports/model_info.json')
+
+            # Log the evaluation errors log file to MLflow
+            mlflow.log_artifact('model_evaluation_errors.log')
+        except Exception as  e:
+            print(f'error is occured:{e}')
 if __name__ == '__main__':
     main()

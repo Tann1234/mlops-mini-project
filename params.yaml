@@ -4,5 +4,5 @@ data_ingestion:
 
 
 feature_engineering:
-  max_features: 100
+  max_features: 450
 
