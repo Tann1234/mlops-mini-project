@@ -1,6 +1,6 @@
 # parmas.yaml
 data_ingestion:
-  test_size: 0.24
+  test_size: 0.34
 
 
 feature_engineering:
