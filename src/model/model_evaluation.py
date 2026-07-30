@@ -14,9 +14,10 @@ import os
 
 
 # set up dagshub credentials for MLFlow tracking
-dagshub_token = os.getenv('DAGSHUB_PAT')
-os.environ('MLFLOW_TRACKING_USERNAME')==dagshub_token
-os.environ('MLFLOW_TRACKING_PASSWORD')==dagshub_token
+dagshub_token = os.getenv("DAGSHUB_PAT")
+
+os.environ["MLFLOW_TRACKING_USERNAME"] = dagshub_token
+os.environ["MLFLOW_TRACKING_PASSWORD"] = dagshub_token
 
 
 

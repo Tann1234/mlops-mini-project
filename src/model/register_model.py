@@ -8,9 +8,12 @@ import dagshub
 from mlflow.tracking import MlflowClient
 
 # set up dagshub credentials for MLFlow tracking
-dagshub_token = os.getenv('DAGSHUB_PAT')
-os.environ('MLFLOW_TRACKING_USERNAME')==dagshub_token
-os.environ('MLFLOW_TRACKING_PASSWORD')==dagshub_token
+dagshub_token = os.getenv("DAGSHUB_PAT")
+if not dagshub_token:
+    raise EnvironmentError("DAGSHUB_PAT environment variable is not set")
+
+os.environ["MLFLOW_TRACKING_USERNAME"] = dagshub_token
+os.environ["MLFLOW_TRACKING_PASSWORD"] = dagshub_token
 mlflow.set_tracking_uri('https://dagshub.com/guptatannu538/mlops-mini-project.mlflow')
 
 def load_model_info(file_path: str) -> dict:
