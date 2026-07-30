@@ -22,9 +22,10 @@ os.environ('MLFLOW_TRACKING_PASSWORD')=dagshub_token
 
 mlflow.set_tracking_uri('https://dagshub.com/guptatannu538/mlops-mini-project.mlflow')
 
+
 def load_model(model_path):
     return pickle.load(open(model_path, 'rb'))
-w=True)
+
 def load_data(data_path):
     test_data = pd.read_csv(data_path)
     X_test = test_data.iloc[:, :-1].values
