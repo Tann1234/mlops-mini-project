@@ -16,7 +16,7 @@ class TestModelLoading(unittest.TestCase):
         mlflow.set_tracking_uri('https://dagshub.com/guptatannu538/mlops-mini-project.mlflow')
 
     # Load the model from MLflow model registry
-        cls.model_name='my_model'
+        cls.model_name='model'
         cls.model_version = cls.get_latest_model_version(cls.model_name)
         cls.model_uri=f'models:/{cls.model_name}/{cls.model_version}'
         cls.model=mlflow.pyfunc.load_model(cls.model_uri)
