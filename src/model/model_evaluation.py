@@ -22,86 +22,160 @@ os.environ["MLFLOW_TRACKING_PASSWORD"] = dagshub_token
 
 
 mlflow.set_tracking_uri('https://dagshub.com/guptatannu538/mlops-mini-project.mlflow')
+# logging configuration
+logger = logging.getLogger('model_evaluation')
+logger.setLevel('DEBUG')
+
+console_handler = logging.StreamHandler()
+console_handler.setLevel('DEBUG')
+
+file_handler = logging.FileHandler('model_evaluation_errors.log')
+file_handler.setLevel('ERROR')
+
+formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+console_handler.setFormatter(formatter)
+file_handler.setFormatter(formatter)
+
+logger.addHandler(console_handler)
+logger.addHandler(file_handler)
+import numpy as np
+import pandas as pd
+import yaml
+import pickle
+import json
+import logging
+import mlflow
+import mlflow.sklearn
+from sklearn.metrics import accuracy_score, precision_score, recall_score, roc_auc_score
+
+# ---------------- Logging Configuration ---------------- #
+logger = logging.getLogger("model_evaluation")
+logger.setLevel(logging.DEBUG)
+
+console_handler = logging.StreamHandler()
+console_handler.setLevel(logging.DEBUG)
+
+file_handler = logging.FileHandler("model_evaluation_errors.log")
+file_handler.setLevel(logging.ERROR)
+
+formatter = logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
+console_handler.setFormatter(formatter)
+file_handler.setFormatter(formatter)
+
+logger.addHandler(console_handler)
+logger.addHandler(file_handler)
 
 
-def load_model(model_path):
-    return pickle.load(open(model_path, 'rb'))
-
-def load_data(data_path):
-    test_data = pd.read_csv(data_path)
-    X_test = test_data.iloc[:, :-1].values
-    y_test = test_data.iloc[:, -1].values
-    return X_test, y_test
-
-def make_prediction(clf, X_test):
-    y_pred = clf.predict(X_test)
-    y_pred_proba = clf.predict_proba(X_test)[:, 1]
-    return y_pred, y_pred_proba
-
-def compute_metrics(y_test, y_pred, y_pred_proba):
-    return {
-        'accuracy': accuracy_score(y_test, y_pred),
-        'precision': precision_score(y_test, y_pred),
-        'recall': recall_score(y_test, y_pred),
-        'auc': roc_auc_score(y_test, y_pred_proba)
-    }
-
-def save_metrics(path, metrics_dict):
-    with open(path, 'w') as f:
-        json.dump(metrics_dict, f, indent=4)
-
-def save_model_info(run_id:str, model_path:str, file_path:str)->None:
-    'Save the model run ID and path to json file.'
+# ---------------- Utility Functions ---------------- #
+def load_model(file_path: str):
+    """Load the trained model from a file."""
     try:
-        model_info={'run_id': run_id, 'model_path': model_path}
-        with open(file_path, 'w') as file:
-            json.dump(model_info, file, indent=4)
+        with open(file_path, "rb") as file:
+            model = pickle.load(file)
+        logger.debug("Model loaded from %s", file_path)
+        return model
+    except FileNotFoundError:
+        logger.error("File not found: %s", file_path)
+        raise
     except Exception as e:
+        logger.error("Unexpected error occurred while loading the model: %s", e)
         raise
 
 
+def load_data(file_path: str) -> pd.DataFrame:
+    """Load data from a CSV file."""
+    try:
+        df = pd.read_csv(file_path)
+        logger.debug("Data loaded from %s", file_path)
+        return df
+    except pd.errors.ParserError as e:
+        logger.error("Failed to parse the CSV file: %s", e)
+        raise
+    except Exception as e:
+        logger.error("Unexpected error occurred while loading the data: %s", e)
+        raise
+
+
+def evaluate_model(clf, X_test: np.ndarray, y_test: np.ndarray) -> dict:
+    """Evaluate the model and return the evaluation metrics."""
+    try:
+        y_pred = clf.predict(X_test)
+        y_pred_proba = clf.predict_proba(X_test)[:, 1]
+
+        metrics_dict = {
+            "accuracy": accuracy_score(y_test, y_pred),
+            "precision": precision_score(y_test, y_pred),
+            "recall": recall_score(y_test, y_pred),
+            "auc": roc_auc_score(y_test, y_pred_proba),
+        }
+        logger.debug("Model evaluation metrics calculated")
+        return metrics_dict
+    except Exception as e:
+        logger.error("Error during model evaluation: %s", e)
+        raise
+
+
+def save_metrics(metrics: dict, file_path: str) -> None:
+    """Save the evaluation metrics to a JSON file."""
+    try:
+        with open(file_path, "w") as file:
+            json.dump(metrics, file, indent=4)
+        logger.debug("Metrics saved to %s", file_path)
+    except Exception as e:
+        logger.error("Error occurred while saving the metrics: %s", e)
+        raise
+
+
+def save_model_info(run_id: str, model_path: str, file_path: str) -> None:
+    """Save the model run ID and path to a JSON file."""
+    try:
+        model_info = {"run_id": run_id, "model_path": model_path}
+        with open(file_path, "w") as file:
+            json.dump(model_info, file, indent=4)
+        logger.debug("Model info saved to %s", file_path)
+    except Exception as e:
+        logger.error("Error occurred while saving the model info: %s", e)
+        raise
+
+
+# ---------------- Main Execution ---------------- #
 def main():
-    mlflow.set_experiment('dvc-pipeline')
+    mlflow.set_experiment("dvc-pipeline")
     with mlflow.start_run() as run:
         try:
-            clf = load_model('models/model.pkl')
-            X_test, y_test = load_data('./data/processed/test_bow.csv')
-            y_pred, y_pred_proba = make_prediction(clf, X_test)
-            metrics_dict = compute_metrics(y_test, y_pred, y_pred_proba)
+            clf = load_model("./models/model.pkl")
+            test_data = load_data("./data/processed/test_bow.csv")
 
-            # Load parameters
-            with open('params.yaml', 'r') as file:
-                params = yaml.safe_load(file)
+            X_test = test_data.iloc[:, :-1].values
+            y_test = test_data.iloc[:, -1].values
 
-            # Save metrics to file
-            save_metrics('reports/metrics.json', metrics_dict)
+            metrics = evaluate_model(clf, X_test, y_test)
+            save_metrics(metrics, "reports/metrics.json")
 
-            # log metrics to MLflow
-            for metric_name, metric_value in metrics_dict.items():
+            # Log metrics to MLflow
+            for metric_name, metric_value in metrics.items():
                 mlflow.log_metric(metric_name, metric_value)
 
-            # log model parameters to MLflow
-            if hasattr(clf, 'get_params'):
+            # Log model parameters to MLflow
+            if hasattr(clf, "get_params"):
                 params = clf.get_params()
                 for param_name, param_value in params.items():
                     mlflow.log_param(param_name, param_value)
 
-
-            # log model to Mlflow
+            # Log model to MLflow
             mlflow.sklearn.log_model(clf, "model")
 
             # Save model info
-            save_model_info(run.info.run_id, 'model', 'reports/experiment_info.json')
-                
-            # Log the metrics file to MLflow
-            mlflow.log_artifact('reports/metrics.json')
+            save_model_info(run.info.run_id, "model", "reports/experiment_info.json")
 
-            # Log the model info file to MLflow
-            mlflow.log_artifact('reports/model_info.json')
+            # Log artifacts
+            mlflow.log_artifact("reports/metrics.json")
+            mlflow.log_artifact("reports/experiment_info.json")
+            mlflow.log_artifact("model_evaluation_errors.log")
 
-            # Log the evaluation errors log file to MLflow
-            mlflow.log_artifact('model_evaluation_errors.log')
-        except Exception as  e:
-            print(f'error is occured:{e}')
-if __name__ == '__main__':
+        except Exception as e:
+            logger.error("Error occurred in main execution: %s", e)
+
+
+if __name__ == "__main__":
     main()
