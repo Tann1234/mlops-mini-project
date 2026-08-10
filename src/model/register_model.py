@@ -1,21 +1,15 @@
-# register model
-# register_model.py
-
 import json
-import mlflow
 import logging
-import os
-import dagshub
+import mlflow
 from mlflow.tracking import MlflowClient
+import dagshub
+import os
+
 
 # Set up DagsHub credentials for MLflow tracking
-
-dagshub_token = os.getenv("DAGSHUB_TOKEN")
+dagshub_token = os.getenv("DAGSHUB_PAT")
 if not dagshub_token:
-    raise RuntimeError("DAGSHUB_TOKEN is not set. Please export it before running.")
-
-os.environ["MLFLOW_TRACKING_USERNAME"] = dagshub_token
-
+    raise EnvironmentError("DAGSHUB_PAT environment variable is not set")
 
 os.environ["MLFLOW_TRACKING_USERNAME"] = dagshub_token
 os.environ["MLFLOW_TRACKING_PASSWORD"] = dagshub_token
@@ -27,73 +21,40 @@ repo_name = "mlops-mini-project"
 # Set up MLflow tracking URI
 mlflow.set_tracking_uri(f'{dagshub_url}/{repo_owner}/{repo_name}.mlflow')
 
-# Configure logging
-logging.basicConfig(level=logging.DEBUG)
-logger = logging.getLogger(__name__)
-
-
-# logging configuration
-logger = logging.getLogger('model_registration')
-logger.setLevel('DEBUG')
-
-console_handler = logging.StreamHandler()
-console_handler.setLevel('DEBUG')
-
-file_handler = logging.FileHandler('model_registration_errors.log')
-file_handler.setLevel('ERROR')
-
-formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-console_handler.setFormatter(formatter)
-file_handler.setFormatter(formatter)
-
-logger.addHandler(console_handler)
-logger.addHandler(file_handler)
+logger = logging.getLogger('register_model')
+logger.setLevel(logging.INFO)
 
 def load_model_info(file_path: str) -> dict:
-    """Load the model info from a JSON file."""
-    try:
-        with open(file_path, 'r') as file:
-            model_info = json.load(file)
-        logger.debug('Model info loaded from %s', file_path)
-        return model_info
-    except FileNotFoundError:
-        logger.error('File not found: %s', file_path)
-        raise
-    except Exception as e:
-        logger.error('Unexpected error occurred while loading the model info: %s', e)
-        raise
+    with open(file_path, 'r') as file:
+        return json.load(file)
 
-def register_model(model_name: str, model_info: dict):
-    """Register the model to the MLflow Model Registry."""
-    try:
-        model_uri = f"runs:/{model_info['run_id']}/{model_info['model_path']}"
+def promote_model(model_name: str, model_info: dict):
+    client = MlflowClient()
+    
+    # Fetch the latest version of the registered model
+    latest_versions = client.get_latest_versions(model_name)
+    if latest_versions:
+        latest_version = latest_versions[-1].version
         
-        # Register the model
-        model_version = mlflow.register_model(model_uri, model_name)
-        
-        # Transition the model to "Staging" stage
-        client = mlflow.tracking.MlflowClient()
-        client.transition_model_version_stage(
-            name=model_name,
-            version=model_version.version,
-            stage="Staging"
-        )
-        
-        logger.debug(f'Model {model_name} version {model_version.version} registered and transitioned to Staging.')
-    except Exception as e:
-        logger.error('Error during model registration: %s', e)
-        raise
+        # Transition the model to the "Staging" stage
+        try:
+            client.transition_model_version_stage(
+                name=model_name,
+                version=latest_version,
+                stage="Production",
+                archive_existing_versions=True # Moves older 'Staging' models to 'Archived'
+            )
+            logger.info(f"Model '{model_name}' version {latest_version} transitioned to 'Production' stage!")
+        except Exception as e:
+            logger.error(f"Failed to transition model stage: {e}")
 
 def main():
     try:
-        model_info_path = 'reports/experiment_info.json'
-        model_info = load_model_info(model_info_path)
-        
-        model_name = "my_model"
-        register_model(model_name, model_info)
+        model_info = load_model_info('reports/experiment_info.json')
+        promote_model("my_model", model_info)
     except Exception as e:
-        logger.error('Failed to complete the model registration process: %s', e)
-        print(f"Error: {e}")
+        logger.error(f"Error during model promotion: {e}")
+        raise
 
 if __name__ == '__main__':
     main()

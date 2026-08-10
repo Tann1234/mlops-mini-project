@@ -9,6 +9,7 @@ import mlflow.sklearn
 import dagshub
 import os
 
+
 # Set up DagsHub credentials for MLflow tracking
 dagshub_token = os.getenv("DAGSHUB_PAT")
 if not dagshub_token:
@@ -101,12 +102,12 @@ def save_metrics(metrics: dict, file_path: str) -> None:
         logger.error('Error occurred while saving the metrics: %s', e)
         raise
 
-def save_model_info(run_id: str, model_path: str, file_path: str) -> None:
+def save_model_info(data: dict, file_path: str) -> None:
     """Save the model run ID and path to a JSON file."""
     try:
-        model_info = {'run_id': run_id, 'model_path': model_path}
+        os.makedirs(os.path.dirname(file_path), exist_ok=True)
         with open(file_path, 'w') as file:
-            json.dump(model_info, file, indent=4)
+            json.dump(data, file, indent=4)
         logger.debug('Model info saved to %s', file_path)
     except Exception as e:
         logger.error('Error occurred while saving the model info: %s', e)
@@ -137,18 +138,24 @@ def main():
                 mlflow.log_param(param_name, param_value)
             
             # Log model to MLflow
-        mlflow.sklearn.log_model(clf, "model")
+        model_info = mlflow.sklearn.log_model(
+            sk_model=clf,
+            artifact_path="model",
+            registered_model_name="my_model"
+                )
             
             # Save model info
-        save_model_info(run.info.run_id, "model", 'reports/experiment_info.json')
+        experiment_info = {
+                'run_id': run.info.run_id,
+                'model_uri': model_info.model_uri
+            }
 
-            
+        save_model_info(experiment_info, 'reports/experiment_info.json')
+
+                  
             # Log the metrics file to MLflow
         mlflow.log_artifact('reports/metrics.json')
-
-            # Log the model info file to MLflow
         mlflow.log_artifact('reports/experiment_info.json')
-
 
             # Log the evaluation errors log file to MLflow
         mlflow.log_artifact('model_evaluation_errors.log')
