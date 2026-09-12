@@ -6,7 +6,11 @@ import dagshub
 import os
 
 
-dagshub.init(repo_owner='guptatannu538', repo_name='mlops-mini-project', mlflow=True)
+# Set up DagsHub credentials for MLflow tracking
+dagshub_token = os.getenv("DAGSHUB_PAT")
+
+os.environ["MLFLOW_TRACKING_USERNAME"] = dagshub_token
+os.environ["MLFLOW_TRACKING_PASSWORD"] = dagshub_token
 
 mlflow.set_tracking_uri('https://dagshub.com/guptatannu538/mlops-mini-project.mlflow')
 
